@@ -1,0 +1,15 @@
+DB_DSN=postgres://myuser:mypass@localhost:5432/mydb?sslmode=disable
+
+up: 
+	docker-compose up -d
+
+run:
+	DSN=$(DB_DSN) go run cmd/gophermart/main.go
+
+down: 
+	docker-compose down
+
+run-app: up run
+
+clean: 
+	docker-compose down -v
