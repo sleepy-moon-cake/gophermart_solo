@@ -1,3 +1,6 @@
 package shared
 
-var UserID = "UserID"
+var (
+	UserID = "UserID"
+	LogErr = "LogErr"
+)

@@ -31,7 +31,11 @@ func (s *UserService) Register(ctx context.Context ,payload *models.RegisterData
 
 	userAuthInfo:=&models.RegisterParams{Login: payload.Login, HashPassword: string(hash)}
 
-	return  s.repository.Register(ctx,userAuthInfo)
+	if err:= s.repository.Register(ctx, userAuthInfo); err != nil {
+		return fmt.Errorf("register: %w",err)
+	}
+
+	return  nil
 }
 
 func (s *UserService) Login(ctx context.Context ,payload *models.RegisterData) error{

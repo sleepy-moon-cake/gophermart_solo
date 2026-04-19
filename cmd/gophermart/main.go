@@ -44,6 +44,7 @@ func run() error{
 
 	router:=handlers.CreateRouter(userService, 
 		middlewares.AuthMiddleware(middlewares.SetSecretKey(config.SecretKey)),
+		middlewares.LoggerMiddleware,
 	)
 
 	slog.Info("server starting", "addr", config.ServerAddress)

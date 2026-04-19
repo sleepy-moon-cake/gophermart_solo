@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -25,10 +26,15 @@ type UserService interface {
 	// GetWithdrawals() error
 }
 
-func CreateRouter (service UserService, authWM func(http.Handler) http.Handler) http.Handler{
+func CreateRouter (service UserService, 
+	authWM func(http.Handler) http.Handler,
+	loggerWM func(http.Handler) http.Handler,
+	) http.Handler{
 	router :=chi.NewRouter()
 	
 	h:=UserHandler{service: service}
+
+	router.Use(loggerWM)
 
 	router.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", h.Register)
@@ -51,11 +57,15 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
 	var payload models.RegisterRequest
 
 	if err:=json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		slog.Error("register: decode","error",err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return;
 	}
 
 	if err:= h.service.Register(r.Context(), &payload); err !=nil {
+		slog.Error("register:","error",err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return;
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -65,13 +75,16 @@ func (h *UserHandler) Login (w http.ResponseWriter, r *http.Request) {
 	var payload models.LoginRequest
 
 	if err:=json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		slog.Error("login: decode","error",err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return;
 	}
 
 	if err:= h.service.Login(r.Context(),&payload); err !=nil {
+		slog.Error("login:","error",err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return;
 	}
 	
 	w.WriteHeader(http.StatusOK)
 }
-
