@@ -40,20 +40,20 @@ func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterP
 	return  fmt.Errorf("register user: %w",err)
 }
 
-func (r *UserRepository) GetHashedPasswordByLogin(ctx context.Context, login string) (string, error){
-	var hash string
+func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*models.User, error){
+	var user models.User
 
 	err:=r.db.QueryRowContext(ctx,
-		"SELECT password FROM users where login = $1",
-		login).Scan(&hash)
+		"SELECT id,login,password FROM users where login = $1",
+		login).Scan(&user.ID, &user.Login, &user.Password)
 
 	if err !=nil {
 		if errors.Is(err, sql.ErrNoRows){
-			return "",fmt.Errorf("get password hash:%w", shared.ErrNotFound)
+			return nil,fmt.Errorf("get password hash:%w", shared.ErrNotFound)
 		}
 
-		return "",fmt.Errorf("get password hash:%w", err)
+		return nil,fmt.Errorf("get password hash:%w", err)
 	}
 	
-	return hash, nil
+	return &user, nil
 }

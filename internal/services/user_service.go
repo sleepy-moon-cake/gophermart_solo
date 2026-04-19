@@ -13,7 +13,7 @@ import (
 
 type Repository interface {
 	Register(context.Context, *models.RegisterParams) error
-	GetHashedPasswordByLogin(context.Context, string) (string,error)
+	GetUserByLogin(context.Context, string) (*models.User,error)
 }
 
 type UserService struct {
@@ -40,22 +40,22 @@ func (s *UserService) Register(ctx context.Context ,payload *models.RegisterData
 	return  nil
 }
 
-func (s *UserService) Login(ctx context.Context ,payload *models.RegisterData) error{
-	hashPassword,err:= s.repository.GetHashedPasswordByLogin(ctx,payload.Login)
+func (s *UserService) Login(ctx context.Context ,payload *models.RegisterData) (*models.User,error){
+	user,err:= s.repository.GetUserByLogin(ctx,payload.Login)
 
 	if err != nil {
-		return fmt.Errorf("login:hash: %w",err)
+		return nil,fmt.Errorf("login:hash: %w",err)
 	}
 
-	if err:= bcrypt.CompareHashAndPassword([]byte(hashPassword),[]byte(payload.Password)); err !=nil {
+	if err:= bcrypt.CompareHashAndPassword([]byte(user.Password),[]byte(payload.Password)); err !=nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return fmt.Errorf("login:compare: %w",shared.ErrNotMatchPassword)
+			return nil,fmt.Errorf("login:compare: %w",shared.ErrNotMatchPassword)
 		}
 
-		return fmt.Errorf("login:compare: %w",err)
+		return nil,fmt.Errorf("login:compare: %w",err)
 	}
 
-	return nil
+	return user, nil
 }
 
 // type UserService interface {

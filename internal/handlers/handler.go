@@ -6,10 +6,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/models"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/shared"
+	"github.com/sleepy-moon-cake/gophermart_solo/internal/utils"
 )
 
 // * `POST /api/user/register` — регистрация пользователя;
@@ -22,19 +24,21 @@ import (
 
 type UserService interface {
 	Register(ctx context.Context, payload *models.RegisterData) error
-	Login(ctx context.Context, payload *models.RegisterData) error
+	Login(ctx context.Context, payload *models.RegisterData) (*models.User,error)
 	// GetOrders() error
 	// GetBalance() error
 	// GetWithdrawals() error
 }
 
+
 func CreateRouter (service UserService, 
+	secretKey string,
 	authWM func(http.Handler) http.Handler,
 	loggerWM func(http.Handler) http.Handler,
 	) http.Handler{
 	router :=chi.NewRouter()
 	
-	h:=UserHandler{service: service}
+	h:=UserHandler{service: service, secretKey:secretKey }
 
 	router.Use(loggerWM)
 
@@ -53,6 +57,8 @@ func CreateRouter (service UserService,
 
 type UserHandler struct {
 	service UserService
+	secretKey string
+	expiredAt time.Duration
 }
 
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
@@ -60,6 +66,12 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
 
 	if err:=json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		slog.Error("register: decode","error",err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return;
+	}
+
+	if payload.Login == "" || payload.Password == "" {
+		slog.Error("register: empty payload params")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return;
 	}
@@ -88,7 +100,9 @@ func (h *UserHandler) Login (w http.ResponseWriter, r *http.Request) {
 		return;
 	}
 
-	if err:= h.service.Login(r.Context(),&payload); err !=nil {
+	user,err:= h.service.Login(r.Context(),&payload) 
+
+	if err !=nil {
 		slog.Error("login:","error",err)
 
 		if errors.Is(err, shared.ErrNotMatchPassword){
@@ -99,6 +113,14 @@ func (h *UserHandler) Login (w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return;
 	}
-	
+
+	token,err:=utils.BuildJwtToken(user.ID, h.secretKey)
+
+	if err != nil {
+    	slog.Error("failed to build jwt", "error", err)
+	    http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Authorization", "Bearer "+token)
 	w.WriteHeader(http.StatusOK)
 }

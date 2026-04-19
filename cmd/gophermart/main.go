@@ -47,7 +47,7 @@ func run() error{
 
 	userService:=services.NewUserService(userRepository)
 
-	router:=handlers.CreateRouter(userService, 
+	router:=handlers.CreateRouter(userService, config.SecretKey,
 		middlewares.AuthMiddleware(middlewares.SetSecretKey(config.SecretKey)),
 		middlewares.LoggerMiddleware,
 	)
