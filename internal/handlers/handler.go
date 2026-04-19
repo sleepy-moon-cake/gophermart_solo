@@ -23,7 +23,7 @@ import (
 // * `GET /api/user/withdrawals` — получение информации о выводе средств с накопительного счёта пользователем.
 
 type UserService interface {
-	Register(ctx context.Context, payload *models.RegisterData) error
+	Register(ctx context.Context, payload *models.RegisterData) (int,error)
 	Login(ctx context.Context, payload *models.RegisterData) (*models.User,error)
 	// GetOrders() error
 	// GetBalance() error
@@ -76,7 +76,9 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
 		return;
 	}
 
-	if err:= h.service.Register(r.Context(), &payload); err !=nil {
+	userID, err:= h.service.Register(r.Context(), &payload);
+	
+	if err !=nil {
 		slog.Error("register:","error",err)
 
 		if errors.Is(err, shared.ErrUserConflict) {
@@ -87,6 +89,17 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return;
 	}
+
+	token,err:=utils.BuildJwtToken(userID, h.secretKey)
+
+	if err != nil {
+    	slog.Error("failed to build jwt", "error", err)
+	    http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
 
 	w.WriteHeader(http.StatusOK)
 } 
@@ -119,6 +132,7 @@ func (h *UserHandler) Login (w http.ResponseWriter, r *http.Request) {
 	if err != nil {
     	slog.Error("failed to build jwt", "error", err)
 	    http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Authorization", "Bearer "+token)

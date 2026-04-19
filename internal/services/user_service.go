@@ -12,7 +12,7 @@ import (
 
 
 type Repository interface {
-	Register(context.Context, *models.RegisterParams) error
+	Register(context.Context, *models.RegisterParams) (int,error)
 	GetUserByLogin(context.Context, string) (*models.User,error)
 }
 
@@ -24,20 +24,21 @@ func NewUserService(repository Repository) *UserService{
 	return &UserService{ repository}
 }
 
-func (s *UserService) Register(ctx context.Context ,payload *models.RegisterData) error{
+func (s *UserService) Register(ctx context.Context ,payload *models.RegisterData) (int,error){
 	hash,err:=bcrypt.GenerateFromPassword([]byte(payload.Password),bcrypt.DefaultCost)
 
 	if err != nil {
-		return fmt.Errorf("register: %w",err)
+		return 0,fmt.Errorf("register: %w",err)
 	}
 
 	userAuthInfo:=&models.RegisterParams{Login: payload.Login, HashPassword: string(hash)}
 
-	if err:= s.repository.Register(ctx, userAuthInfo); err != nil {
-		return fmt.Errorf("register: %w",err)
+	userID,err:= s.repository.Register(ctx, userAuthInfo)
+	if err != nil {
+		return 0, fmt.Errorf("register: %w",err)
 	}
 
-	return  nil
+	return  userID,nil
 }
 
 func (s *UserService) Login(ctx context.Context ,payload *models.RegisterData) (*models.User,error){

@@ -20,24 +20,26 @@ type UserRepository struct{
 	db *sql.DB
 }
 
-func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterParams) error {
-	_,err:=r.db.ExecContext(ctx,
-		"INSERT INTO users (login, password) VALUES ($1, $2)",
-		userCred.Login, 
+func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterParams) (int,error) {
+	var lastInsertId int
+
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO users (login, password) VALUES ($1, $2) RETURNING id",
+		userCred.Login,
 		userCred.HashPassword,
-	)
+	).Scan(&lastInsertId)
 
 	if err == nil {
-		return nil
+		return lastInsertId, nil
 	}
-	
+
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-		return fmt.Errorf("register user: %w",shared.ErrUserConflict)
+		return 0, fmt.Errorf("register user: %w", shared.ErrUserConflict)
 	}
 
-	return  fmt.Errorf("register user: %w",err)
+	return 0, fmt.Errorf("register user: %w", err)
 }
 
 func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*models.User, error){
