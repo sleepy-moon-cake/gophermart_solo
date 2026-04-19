@@ -31,6 +31,11 @@ func run() error{
 
 	db,err:=database.DataBase(ctx, database.DbConfig{DSN: config.DatabaseSoruceName})
 
+	if err:=database.RunMigration(database.DbConfig{DSN: config.DatabaseSoruceName}); err !=nil {
+		slog.Error("faied to migrate db", "error", err)
+		os.Exit(1)
+	}
+
 	if err !=nil {
 		slog.Error("failed to init database","error", err)
 		os.Exit(1)

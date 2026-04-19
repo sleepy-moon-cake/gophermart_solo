@@ -9,11 +9,8 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/models"
+	"github.com/sleepy-moon-cake/gophermart_solo/internal/shared"
 )
-
-var ErrUserConflict = errors.New("user already exist")
-
-var ErrNotFound = errors.New("user not found")
 
 func NewUserRepository(db *sql.DB) *UserRepository{
 	return &UserRepository{db}
@@ -37,7 +34,7 @@ func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterP
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-		return fmt.Errorf("register user: %w",ErrUserConflict)
+		return fmt.Errorf("register user: %w",shared.ErrUserConflict)
 	}
 
 	return  fmt.Errorf("register user: %w",err)
@@ -52,7 +49,7 @@ func (r *UserRepository) GetHashedPasswordByLogin(ctx context.Context, login str
 
 	if err !=nil {
 		if errors.Is(err, sql.ErrNoRows){
-			return "",fmt.Errorf("get password hash:%w", ErrNotFound)
+			return "",fmt.Errorf("get password hash:%w", shared.ErrNotFound)
 		}
 
 		return "",fmt.Errorf("get password hash:%w", err)

@@ -11,5 +11,12 @@ down:
 
 run-app: up run
 
+migrate-up:
+	migrate -path migrations -database "$(DB_DSN)" up
+
+# Команда для отката
+migrate-down:
+	migrate -path migrations -database "$(DB_DSN)" down
+
 clean: 
 	docker-compose down -v

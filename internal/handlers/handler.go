@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/models"
+	"github.com/sleepy-moon-cake/gophermart_solo/internal/shared"
 )
 
 // * `POST /api/user/register` — регистрация пользователя;
@@ -64,6 +66,12 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request){
 
 	if err:= h.service.Register(r.Context(), &payload); err !=nil {
 		slog.Error("register:","error",err)
+
+		if errors.Is(err, shared.ErrUserConflict) {
+			http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+			return
+		}
+
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return;
 	}
@@ -82,6 +90,12 @@ func (h *UserHandler) Login (w http.ResponseWriter, r *http.Request) {
 
 	if err:= h.service.Login(r.Context(),&payload); err !=nil {
 		slog.Error("login:","error",err)
+
+		if errors.Is(err, shared.ErrNotMatchPassword){
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return;
+		}
+
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return;
 	}

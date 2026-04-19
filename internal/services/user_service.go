@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/models"
+	"github.com/sleepy-moon-cake/gophermart_solo/internal/shared"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -46,6 +48,10 @@ func (s *UserService) Login(ctx context.Context ,payload *models.RegisterData) e
 	}
 
 	if err:= bcrypt.CompareHashAndPassword([]byte(hashPassword),[]byte(payload.Password)); err !=nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return fmt.Errorf("login:compare: %w",shared.ErrNotMatchPassword)
+		}
+
 		return fmt.Errorf("login:compare: %w",err)
 	}
 
