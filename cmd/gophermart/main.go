@@ -15,48 +15,47 @@ import (
 )
 
 func main() {
-	err:= run();
+	err := run()
 
-	if err !=nil {
+	if err != nil {
 		slog.Error("failed to run app")
 		os.Exit(1)
 	}
 }
 
+func run() error {
+	ctx := context.Background()
 
-func run() error{
-	ctx:= context.Background()
+	config := configs.GetConfig()
 
-	config:= configs.GetConfig()
+	db, err := database.DataBase(ctx, database.DbConfig{DSN: config.DatabaseSoruceName})
 
-	db,err:=database.DataBase(ctx, database.DbConfig{DSN: config.DatabaseSoruceName})
-
-	if err:=database.RunMigration(database.DbConfig{DSN: config.DatabaseSoruceName}); err !=nil {
+	if err := database.RunMigration(database.DbConfig{DSN: config.DatabaseSoruceName}); err != nil {
 		slog.Error("faied to migrate db", "error", err)
 		os.Exit(1)
 	}
 
-	if err !=nil {
-		slog.Error("failed to init database","error", err)
+	if err != nil {
+		slog.Error("failed to init database", "error", err)
 		os.Exit(1)
 	}
 
 	defer db.Close()
 
-	userRepository:= repositories.NewUserRepository(db)
+	userRepository := repositories.NewUserRepository(db)
 
-	userService:=services.NewUserService(userRepository)
+	userService := services.NewUserService(userRepository)
 
-	router:=handlers.CreateRouter(userService, config.SecretKey,
+	router := handlers.CreateRouter(userService, config.SecretKey,
 		middlewares.AuthMiddleware(middlewares.SetSecretKey(config.SecretKey)),
 		middlewares.LoggerMiddleware,
 	)
 
 	slog.Info("server starting", "addr", config.ServerAddress)
 
-	if err:=http.ListenAndServe(config.ServerAddress, router); err !=nil {
+	if err := http.ListenAndServe(config.ServerAddress, router); err != nil {
 		slog.Error("server failed")
-		return err;
+		return err
 	}
 
 	return nil

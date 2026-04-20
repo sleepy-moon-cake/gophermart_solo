@@ -4,8 +4,11 @@ import "errors"
 
 var (
 	// db errors
-	ErrUserConflict = errors.New("user already exist")
-	ErrNotFound = errors.New("user not found")
-	// service errors 
-	 ErrNotMatchPassword = errors.New("not match")
+	ErrWriteConflict = errors.New("resource conflict")
+	ErrNotFound      = errors.New("resource not found")
+	ErrAlreadyExists = errors.New("resource already exists")
+	// service errors
+	ErrNotMatchPassword = errors.New("not match")
+
+	ErrUnauthorized = errors.New("not unauthorized")
 )

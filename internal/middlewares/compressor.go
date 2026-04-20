@@ -1,0 +1,134 @@
+package middlewares
+
+import (
+	"compress/gzip"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+type compressWriter struct {
+	http.ResponseWriter
+	zw                *gzip.Writer
+	compress          bool
+	writeHeaderCalled bool
+}
+
+func newCompressWriter(w http.ResponseWriter) *compressWriter {
+	return &compressWriter{
+		ResponseWriter:    w,
+		zw:                nil,
+		compress:          false,
+		writeHeaderCalled: false,
+	}
+}
+
+func (c *compressWriter) Write(p []byte) (int, error) {
+	if !c.writeHeaderCalled {
+		c.WriteHeader(http.StatusOK)
+	}
+
+	if c.compress {
+		return c.zw.Write(p)
+	}
+	return c.ResponseWriter.Write(p)
+}
+
+func (c *compressWriter) Close() error {
+	if c.compress {
+		return c.zw.Close()
+	}
+	return nil
+}
+
+func (c *compressWriter) WriteHeader(statusCode int) {
+	if c.writeHeaderCalled {
+		return
+	}
+
+	c.writeHeaderCalled = true
+
+	ct := c.Header().Get("Content-Type")
+	cl := c.Header().Get("Content-Length")
+	size, _ := strconv.Atoi(cl)
+
+	if statusCode >= 200 && statusCode < 300 &&
+		((strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html")) && (size == 0 || size >= 1400)) {
+		c.Header().Set("Content-Encoding", "gzip")
+
+		c.Header().Del("Content-Length")
+		c.compress = true
+		c.zw = gzip.NewWriter(c.ResponseWriter)
+	}
+	c.ResponseWriter.WriteHeader(statusCode)
+}
+
+type compressReader struct {
+	r  io.ReadCloser
+	zr *gzip.Reader
+}
+
+func newCompressReader(r io.ReadCloser) (*compressReader, error) {
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("create gzip reader: %w", err)
+	}
+
+	return &compressReader{
+		r:  r,
+		zr: zr,
+	}, nil
+}
+
+func (c compressReader) Read(p []byte) (n int, err error) {
+	return c.zr.Read(p)
+}
+
+func (c *compressReader) Close() error {
+	if err := c.r.Close(); err != nil {
+		return fmt.Errorf("close io reader: %w", err)
+	}
+
+	if err := c.zr.Close(); err != nil {
+		return fmt.Errorf("close gzip reader: %w", err)
+	}
+
+	return nil
+}
+
+func Compressor(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if shouldDecompressRequest(w, r) {
+			cr, err := newCompressReader(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = cr
+		}
+
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			cw := newCompressWriter(w)
+			defer cw.Close()
+			w = cw
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func shouldDecompressRequest(_ http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {
+		return false
+	}
+
+	for _, v := range r.Header.Values("Content-Encoding") {
+		if isSupport := strings.Contains(v, "gzip"); isSupport {
+			ct := r.Header.Get("Content-Type")
+			return strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html") || strings.HasPrefix(ct, "text/plain")
+		}
+	}
+	return false
+}

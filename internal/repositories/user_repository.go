@@ -12,15 +12,15 @@ import (
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/shared"
 )
 
-func NewUserRepository(db *sql.DB) *UserRepository{
+func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db}
 }
 
-type UserRepository struct{
+type UserRepository struct {
 	db *sql.DB
 }
 
-func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterParams) (int,error) {
+func (r *UserRepository) Register(ctx context.Context, userCred *models.RegisterParams) (int, error) {
 	var lastInsertId int
 
 	err := r.db.QueryRowContext(ctx,
@@ -36,26 +36,61 @@ func (r *UserRepository) Register(ctx context.Context,userCred *models.RegisterP
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-		return 0, fmt.Errorf("register user: %w", shared.ErrUserConflict)
+		return 0, fmt.Errorf("register user: %w", shared.ErrWriteConflict)
 	}
 
 	return 0, fmt.Errorf("register user: %w", err)
 }
 
-func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*models.User, error){
+func (r *UserRepository) GetUserByLogin(ctx context.Context, login string) (*models.User, error) {
 	var user models.User
 
-	err:=r.db.QueryRowContext(ctx,
+	err := r.db.QueryRowContext(ctx,
 		"SELECT id,login,password FROM users where login = $1",
 		login).Scan(&user.ID, &user.Login, &user.Password)
 
-	if err !=nil {
-		if errors.Is(err, sql.ErrNoRows){
-			return nil,fmt.Errorf("get password hash:%w", shared.ErrNotFound)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("get password hash:%w", shared.ErrNotFound)
 		}
 
-		return nil,fmt.Errorf("get password hash:%w", err)
+		return nil, fmt.Errorf("get password hash:%w", err)
 	}
-	
+
 	return &user, nil
+}
+
+func (r *UserRepository) RegisterOrder(ctx context.Context, userId int, orderNumber string) error {
+	var ownerId int
+
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO orders (owner_id, number) VALUES ($1, $2) RETURNING owner_id",
+		userId,
+		orderNumber,
+	).Scan(&ownerId)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+
+			selectErr := r.db.QueryRowContext(ctx,
+				"SELECT owner_id FROM orders WHERE number = $1",
+				orderNumber).Scan(&ownerId)
+
+			if selectErr != nil {
+				return fmt.Errorf("register order: select: %w", selectErr)
+			}
+
+			if ownerId == userId {
+				return fmt.Errorf("register order: %w", shared.ErrAlreadyExists)
+			}
+
+			return fmt.Errorf("register order: %w", shared.ErrWriteConflict)
+		}
+
+		return fmt.Errorf("register order: %w", err)
+	}
+
+	return nil
 }

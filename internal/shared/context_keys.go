@@ -1,6 +1,6 @@
 package shared
 
-var (
+const (
 	UserID = "UserID"
 	LogErr = "LogErr"
 )
