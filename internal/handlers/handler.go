@@ -20,6 +20,7 @@ import (
 // * `POST /api/user/login` — аутентификация пользователя;
 // * `POST /api/user/orders` — загрузка пользователем номера заказа для расчёта;
 // * `GET /api/user/orders` — получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях;
+// HERE
 // * `GET /api/user/balance` — получение текущего баланса счёта баллов лояльности пользователя;
 // * `POST /api/user/balance/withdraw` — запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа;
 // * `GET /api/user/withdrawals` — получение информации о выводе средств с накопительного счёта пользователем.
@@ -29,7 +30,7 @@ type UserService interface {
 	Login(ctx context.Context, payload *models.RegisterData) (*models.User, error)
 	RegisterOrder(context.Context, string) error
 	GetOrders(context.Context) ([]models.Order, error)
-	// GetBalance() error
+	GetBalance(context.Context) (*models.Balance, error)
 	// GetWithdrawals() error
 }
 
@@ -55,6 +56,7 @@ func CreateRouter(service UserService,
 			r.Use(authWM)
 			r.Post("/orders", h.RegisterOrder)
 			r.Get("/orders", h.GetOrders)
+			r.Get("/balance", h.GetBalance)
 		})
 	})
 
@@ -213,5 +215,30 @@ func (h *UserHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(orders); err != nil {
 		slog.Error("failed to Encode orders", "error", err)
+	}
+}
+
+func (h *UserHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
+	balance, err := h.service.GetBalance(r.Context())
+
+	if err != nil {
+		slog.Error("failed to get balance", "error", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	balancefloat := struct {
+		Current   float64 `json:"current"`
+		Withdrawn float64 `json:"withdrawn"`
+	}{
+		Current:   float64(balance.Current) / 100,
+		Withdrawn: float64(balance.Withdrawn) / 100,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(balancefloat); err != nil {
+		slog.Error("failed to encode balance", "error", err)
+		return
 	}
 }

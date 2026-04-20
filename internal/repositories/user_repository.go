@@ -96,7 +96,6 @@ func (r *UserRepository) RegisterOrder(ctx context.Context, userId int, orderNum
 }
 
 func (r *UserRepository) GetUserOrders(ctx context.Context, userId int) ([]models.Order, error) {
-
 	var orders = make([]models.Order, 0)
 
 	rows, err := r.db.QueryContext(ctx,
@@ -123,4 +122,22 @@ func (r *UserRepository) GetUserOrders(ctx context.Context, userId int) ([]model
 	}
 
 	return orders, nil
+}
+
+func (r *UserRepository) GetUserBalance(ctx context.Context, userId int) (*models.Balance, error) {
+	var balance models.Balance
+
+	err := r.db.QueryRowContext(ctx,
+		"SELECT current, withdrawn FROM balance WHERE owner_id = $1", userId,
+	).Scan(&balance.Current, &balance.Withdrawn)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return &models.Balance{Current: 0, Withdrawn: 0}, nil
+		}
+
+		return nil, err
+	}
+
+	return &balance, nil
 }

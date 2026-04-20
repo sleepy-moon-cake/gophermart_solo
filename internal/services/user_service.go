@@ -15,6 +15,7 @@ type Repository interface {
 	GetUserByLogin(context.Context, string) (*models.User, error)
 	RegisterOrder(context.Context, int, string) error
 	GetUserOrders(context.Context, int) ([]models.Order, error)
+	GetUserBalance(context.Context, int) (*models.Balance, error)
 }
 
 type UserService struct {
@@ -84,6 +85,16 @@ func (s *UserService) GetOrders(ctx context.Context) ([]models.Order, error) {
 	}
 
 	return s.repository.GetUserOrders(ctx, userID)
+}
+
+func (s *UserService) GetBalance(ctx context.Context) (*models.Balance, error) {
+	userID, ok := ctx.Value(shared.UserID).(int)
+
+	if !ok {
+		return nil, fmt.Errorf("get user balance: %w", shared.ErrUnauthorized)
+	}
+
+	return s.repository.GetUserBalance(ctx, userID)
 }
 
 // type UserService interface {
