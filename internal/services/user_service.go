@@ -14,6 +14,7 @@ type Repository interface {
 	Register(context.Context, *models.RegisterParams) (int, error)
 	GetUserByLogin(context.Context, string) (*models.User, error)
 	RegisterOrder(context.Context, int, string) error
+	GetUserOrders(context.Context, int) ([]models.Order, error)
 }
 
 type UserService struct {
@@ -73,6 +74,16 @@ func (s *UserService) RegisterOrder(ctx context.Context, orderNumber string) err
 	}
 
 	return nil
+}
+
+func (s *UserService) GetOrders(ctx context.Context) ([]models.Order, error) {
+	userID, ok := ctx.Value(shared.UserID).(int)
+
+	if !ok {
+		return nil, fmt.Errorf("register order: %w", shared.ErrUnauthorized)
+	}
+
+	return s.repository.GetUserOrders(ctx, userID)
 }
 
 // type UserService interface {

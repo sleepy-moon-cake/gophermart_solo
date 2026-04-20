@@ -94,3 +94,33 @@ func (r *UserRepository) RegisterOrder(ctx context.Context, userId int, orderNum
 
 	return nil
 }
+
+func (r *UserRepository) GetUserOrders(ctx context.Context, userId int) ([]models.Order, error) {
+
+	var orders = make([]models.Order, 0)
+
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT number, status, uploaded_at FROM orders WHERE owner_id = $1 ORDER BY uploaded_at ASC",
+		userId)
+
+	if err != nil {
+		return nil, fmt.Errorf("get user orders: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var order models.Order
+
+		err := rows.Scan(&order.Number, &order.Status, &order.UploadedAt)
+		if err != nil {
+			return nil, fmt.Errorf("get user orders scan: %w", err)
+		}
+		orders = append(orders, order)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("get user orders rows has error: %w", err)
+	}
+
+	return orders, nil
+}

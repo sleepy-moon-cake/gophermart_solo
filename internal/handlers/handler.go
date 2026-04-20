@@ -28,7 +28,7 @@ type UserService interface {
 	Register(ctx context.Context, payload *models.RegisterData) (int, error)
 	Login(ctx context.Context, payload *models.RegisterData) (*models.User, error)
 	RegisterOrder(context.Context, string) error
-	// GetOrders() error
+	GetOrders(context.Context) ([]models.Order, error)
 	// GetBalance() error
 	// GetWithdrawals() error
 }
@@ -54,6 +54,7 @@ func CreateRouter(service UserService,
 		r.Group(func(r chi.Router) {
 			r.Use(authWM)
 			r.Post("/orders", h.RegisterOrder)
+			r.Get("/orders", h.GetOrders)
 		})
 	})
 
@@ -185,10 +186,32 @@ func (h *UserHandler) RegisterOrder(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 500
-		slog.Error("failed to register ordet", "error", err)
+		slog.Error("failed to register order", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	// 202
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *UserHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	orders, err := h.service.GetOrders(r.Context())
+
+	if err != nil {
+		slog.Error("failed to get orders", "error", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(orders) == 0 {
+		slog.Info("get orders: empty")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		slog.Error("failed to Encode orders", "error", err)
+	}
 }
