@@ -58,6 +58,7 @@ func CreateRouter(service UserService,
 			r.Post("/orders", h.RegisterOrder)
 			r.Get("/orders", h.GetOrders)
 			r.Get("/balance", h.GetBalance)
+			r.Post("/balance/withdraw", h.WithdrawBalance)
 		})
 	})
 
