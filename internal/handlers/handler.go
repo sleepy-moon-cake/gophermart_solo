@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -20,9 +21,9 @@ import (
 // * `POST /api/user/login` — аутентификация пользователя;
 // * `POST /api/user/orders` — загрузка пользователем номера заказа для расчёта;
 // * `GET /api/user/orders` — получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях;
-// HERE
 // * `GET /api/user/balance` — получение текущего баланса счёта баллов лояльности пользователя;
 // * `POST /api/user/balance/withdraw` — запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа;
+// HERE
 // * `GET /api/user/withdrawals` — получение информации о выводе средств с накопительного счёта пользователем.
 
 type UserService interface {
@@ -31,7 +32,7 @@ type UserService interface {
 	RegisterOrder(context.Context, string) error
 	GetOrders(context.Context) ([]models.Order, error)
 	GetBalance(context.Context) (*models.Balance, error)
-	// GetWithdrawals() error
+	WithdrawBalance(context.Context, *models.Withdraw) error
 }
 
 // POST /api/user/orders
@@ -101,7 +102,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	token, err := utils.BuildJwtToken(userID, h.secretKey)
 
 	if err != nil {
-		slog.Error("failed to build jwt", "error", err)
+		slog.Error("register: failed to build jwt", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -138,7 +139,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := utils.BuildJwtToken(user.ID, h.secretKey)
 
 	if err != nil {
-		slog.Error("failed to build jwt", "error", err)
+		slog.Error("login: failed to build jwt", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -149,14 +150,14 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) RegisterOrder(w http.ResponseWriter, r *http.Request) {
 	if value := r.Header.Get("Content-Type"); value != "text/plain" {
-		slog.Error("failed to register order", "content-type", value)
+		slog.Error("registerOrder: failed to register order", "content-type", value)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
 	body, errRead := io.ReadAll(r.Body)
 	if errRead != nil || len(body) == 0 {
-		slog.Error("empty or unreadable body", "error", errRead)
+		slog.Error("registerOrder: empty or unreadable body", "error", errRead)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -165,7 +166,7 @@ func (h *UserHandler) RegisterOrder(w http.ResponseWriter, r *http.Request) {
 
 	if !utils.IsLuhnValid(orderNumber) {
 		// 422
-		slog.Error("order number is not valid")
+		slog.Error("registerOrder: order number is not valid")
 		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
 		return
 	}
@@ -175,20 +176,20 @@ func (h *UserHandler) RegisterOrder(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, shared.ErrAlreadyExists) {
 			// 200
-			slog.Error("order already registered by current user", "error", err)
+			slog.Error("registerOrder: order already registered by current user", "error", err)
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
 		if errors.Is(err, shared.ErrWriteConflict) {
 			// 409
-			slog.Error("order already registered by another user", "error", err)
+			slog.Error("registerOrder: order already registered by another user", "error", err)
 			http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
 			return
 		}
 
 		// 500
-		slog.Error("failed to register order", "error", err)
+		slog.Error("registerOrder: failed to register order", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -200,7 +201,7 @@ func (h *UserHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	orders, err := h.service.GetOrders(r.Context())
 
 	if err != nil {
-		slog.Error("failed to get orders", "error", err)
+		slog.Error("getOrders: failed to get orders", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -214,7 +215,7 @@ func (h *UserHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(orders); err != nil {
-		slog.Error("failed to Encode orders", "error", err)
+		slog.Error("getOrders: failed to Encode orders", "error", err)
 	}
 }
 
@@ -222,7 +223,7 @@ func (h *UserHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	balance, err := h.service.GetBalance(r.Context())
 
 	if err != nil {
-		slog.Error("failed to get balance", "error", err)
+		slog.Error("getBalance: failed to get balance", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -238,7 +239,62 @@ func (h *UserHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(balancefloat); err != nil {
-		slog.Error("failed to encode balance", "error", err)
+		slog.Error("getBalance: failed to encode balance", "error", err)
 		return
 	}
+}
+
+func (h *UserHandler) WithdrawBalance(w http.ResponseWriter, r *http.Request) {
+	var request models.WithdrawRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		// 400
+		slog.Error("withdrawBalance: failed to decode")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if request.Sum <= 0 {
+		// 400
+		slog.Error("withdrawBalance: invalid sum")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if !utils.IsLuhnValid(request.OrderNumber) {
+		// 422
+		slog.Error("withdrawBalance: order number is not valid")
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
+
+	intSum := int(math.Round(float64(request.Sum) * 100))
+
+	err := h.service.WithdrawBalance(r.Context(), &models.Withdraw{
+		OrderNumber: request.OrderNumber,
+		Sum:         intSum,
+	})
+
+	if err != nil {
+		if errors.Is(err, shared.ErrNoAffectedRows) {
+			// 402
+			slog.Error("withdrawBalance", "error", err)
+			http.Error(w, http.StatusText(http.StatusPaymentRequired), http.StatusPaymentRequired)
+			return
+		}
+
+		if errors.Is(err, shared.ErrWriteConflict) {
+			// 409
+			slog.Error("withdrawBalance", "error", err)
+			http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+			return
+		}
+
+		// 500
+		slog.Error("withdrawBalance", "error", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

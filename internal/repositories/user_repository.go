@@ -141,3 +141,43 @@ func (r *UserRepository) GetUserBalance(ctx context.Context, userId int) (*model
 
 	return &balance, nil
 }
+
+func (r *UserRepository) WithdrawBalance(ctx context.Context, userID int, withdraw *models.Withdraw) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+
+	if err != nil {
+		return fmt.Errorf("withdrawBalance: %w", err)
+	}
+	defer tx.Rollback()
+
+	resB, err := tx.ExecContext(ctx,
+		"UPDATE balance SET current = current - $1, withdrawn = withdrawn + $1 WHERE owner_id = $2 AND current >= $1",
+		withdraw.Sum, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("withdrawBalance update: %w", err)
+	}
+
+	if value, _ := resB.RowsAffected(); value == 0 {
+		return fmt.Errorf("withdrawBalance: withdrawn: %w", shared.ErrNoAffectedRows)
+	}
+
+	_, err = tx.ExecContext(ctx,
+		"INSERT INTO withdraws (order_number, sum, owner_id) VALUES ($1, $2, $3)",
+		withdraw.OrderNumber, withdraw.Sum, userID,
+	)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+			return fmt.Errorf("withdrawBalance insert conflict: %w", shared.ErrWriteConflict)
+		}
+		return fmt.Errorf("withdrawBalance insert: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("withdrawBalance commit: %w", err)
+	}
+
+	return nil
+}
