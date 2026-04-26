@@ -17,6 +17,7 @@ type Repository interface {
 	GetUserOrders(context.Context, int) ([]models.Order, error)
 	GetUserBalance(context.Context, int) (*models.Balance, error)
 	WithdrawBalance(context.Context, int, *models.Withdraw) error
+	Withdrawals(context.Context, int) ([]models.Withdraw, error)
 }
 
 type UserService struct {
@@ -106,6 +107,16 @@ func (s *UserService) WithdrawBalance(ctx context.Context, withdraw *models.With
 	}
 
 	return s.repository.WithdrawBalance(ctx, userID, withdraw)
+}
+
+func (s *UserService) Withdrawals(ctx context.Context) ([]models.Withdraw, error) {
+	userID, ok := ctx.Value(shared.UserID).(int)
+
+	if !ok {
+		return nil, fmt.Errorf("get user balance: %w", shared.ErrUnauthorized)
+	}
+
+	return s.repository.Withdrawals(ctx, userID)
 }
 
 // type UserService interface {

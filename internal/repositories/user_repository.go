@@ -163,7 +163,7 @@ func (r *UserRepository) WithdrawBalance(ctx context.Context, userID int, withdr
 	}
 
 	_, err = tx.ExecContext(ctx,
-		"INSERT INTO withdraws (order_number, sum, owner_id) VALUES ($1, $2, $3)",
+		"INSERT INTO withdrawals (order_number, sum, owner_id) VALUES ($1, $2, $3)",
 		withdraw.OrderNumber, withdraw.Sum, userID,
 	)
 
@@ -180,4 +180,37 @@ func (r *UserRepository) WithdrawBalance(ctx context.Context, userID int, withdr
 	}
 
 	return nil
+}
+
+func (r *UserRepository) Withdrawals(ctx context.Context, userID int) ([]models.Withdraw, error) {
+	query := `
+		SELECT order_number, sum, processed_at 
+		FROM withdrawals 
+		WHERE owner_id = $1 
+		ORDER BY processed_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+
+	if err != nil {
+		return nil, fmt.Errorf("Withdrawals, select: %w", err)
+	}
+	defer rows.Close()
+
+	records := make([]models.Withdraw, 0)
+
+	for rows.Next() {
+		var record models.Withdraw
+
+		if err := rows.Scan(&record.OrderNumber, &record.Sum, &record.ProcessedAt); err != nil {
+			return nil, fmt.Errorf("Withdrawals, scan: %w", err)
+		}
+
+		records = append(records, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("Withdrawals, rows err: %w", err)
+	}
+
+	return records, nil
 }

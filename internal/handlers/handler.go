@@ -33,6 +33,7 @@ type UserService interface {
 	GetOrders(context.Context) ([]models.Order, error)
 	GetBalance(context.Context) (*models.Balance, error)
 	WithdrawBalance(context.Context, *models.Withdraw) error
+	Withdrawals(context.Context) ([]models.Withdraw, error)
 }
 
 // POST /api/user/orders
@@ -298,4 +299,35 @@ func (h *UserHandler) WithdrawBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *UserHandler) Withdrawals(w http.ResponseWriter, r *http.Request) {
+	withdraws, err := h.service.Withdrawals(r.Context())
+
+	if err != nil {
+		slog.Error("Withdrawals", "error", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(withdraws) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	body := make([]models.WithdrawWithCent, 0, len(withdraws))
+
+	for _, v := range withdraws {
+		body = append(body, models.WithdrawWithCent{
+			OrderNumber: v.OrderNumber,
+			Sum:         float64(v.Sum) / 100,
+			ProcessedAt: v.ProcessedAt,
+		})
+	}
+
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		slog.Error("Withdrawals, encode", "error", err)
+	}
 }
