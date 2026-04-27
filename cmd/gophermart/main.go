@@ -5,6 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/configs"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/database"
@@ -25,14 +28,15 @@ func main() {
 }
 
 func run() error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	config := configs.GetConfig()
 
 	db, err := database.DataBase(ctx, database.DbConfig{DSN: config.DatabaseSoruceName})
 
 	if err := database.RunMigration(database.DbConfig{DSN: config.DatabaseSoruceName}); err != nil {
-		slog.Error("faied to migrate db", "error", err)
+		slog.Error("failed to migrate db", "error", err)
 		os.Exit(1)
 	}
 
@@ -49,6 +53,8 @@ func run() error {
 
 	orderRepository := repositories.NewOrderRepository(db)
 	accrualWorker := workers.CreateAccrualWorker(orderRepository, config.AccrualSystemAddress)
+
+	// Start worker
 	go func() {
 		slog.Info("accrual worker started")
 		accrualWorker.Run(ctx)
@@ -59,12 +65,30 @@ func run() error {
 		middlewares.LoggerMiddleware,
 	)
 
-	slog.Info("server starting", "addr", config.ServerAddress)
-
-	if err := http.ListenAndServe(config.ServerAddress, router); err != nil {
-		slog.Error("server failed")
-		return err
+	srv := http.Server{
+		Addr:    config.ServerAddress,
+		Handler: router,
 	}
+
+	// Start Server
+	go func() {
+		slog.Info("server starting", "addr", config.ServerAddress)
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server failed", "error", err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	ctxWithTime, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if err := srv.Shutdown(ctxWithTime); err != nil {
+		slog.Error("forced shutdown", "error", err)
+	}
+
+	slog.Info("Stop server")
 
 	return nil
 }
