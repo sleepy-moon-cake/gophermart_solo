@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS balance (
     id SERIAL PRIMARY KEY,
-    owner_id INTEGER NOT NULL,
+    owner_id INTEGER NOT NULL UNIQUE,
     current INTEGER NOT NULL DEFAULT 0,
     withdrawn INTEGER NOT NULL DEFAULT 0,
     

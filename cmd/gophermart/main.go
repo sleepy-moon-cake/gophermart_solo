@@ -12,6 +12,7 @@ import (
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/middlewares"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/repositories"
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/services"
+	"github.com/sleepy-moon-cake/gophermart_solo/internal/workers"
 )
 
 func main() {
@@ -45,6 +46,13 @@ func run() error {
 	userRepository := repositories.NewUserRepository(db)
 
 	userService := services.NewUserService(userRepository)
+
+	orderRepository := repositories.NewOrderRepository(db)
+	accrualWorker := workers.CreateAccrualWorker(orderRepository, config.AccrualSystemAddress)
+	go func() {
+		slog.Info("accrual worker started")
+		accrualWorker.Run(ctx)
+	}()
 
 	router := handlers.CreateRouter(userService, config.SecretKey,
 		middlewares.AuthMiddleware(middlewares.SetSecretKey(config.SecretKey)),

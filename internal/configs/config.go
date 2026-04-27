@@ -1,39 +1,50 @@
 package configs
 
 import (
+	"flag"
 	"os"
-)
-
-
-var (
-    secretKey = "JWT_SECRET_KEY"
-	dsn = "DSN"
-	serverAddr = "SERVER_ADDRESS"
+	"strings"
 )
 
 type Config struct {
-	SecretKey string
-	DatabaseSoruceName string
-	ServerAddress string
+	SecretKey            string
+	DatabaseSoruceName   string
+	ServerAddress        string
+	AccrualSystemAddress string
 }
 
+func GetConfig() *Config {
+	a := flag.String("a", "localhost:8080", "server address")
+	d := flag.String("d", "", "database uri")
+	r := flag.String("r", "http://localhost:8081", "accrual system address")
+	flag.Parse()
 
-func GetConfig() *Config{
 	config := &Config{
-		SecretKey: "sXYKyBxAj+8mw3z58xeLV8AxBOevMA9eGajV+QOAwUA=",
-		ServerAddress: "localhost:8080",
+		SecretKey:            "sXYKyBxAj+8mw3z58xeLV8AxBOevMA9eGajV+QOAwUA=",
+		ServerAddress:        *a,
+		DatabaseSoruceName:   *d,
+		AccrualSystemAddress: *r,
 	}
 
-	if value,ok:= os.LookupEnv(secretKey); ok {
-		config.SecretKey = value
+	// 2. Читаем ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ (они приоритетнее флагов по ТЗ)
+	if val := os.Getenv("RUN_ADDRESS"); val != "" {
+		config.ServerAddress = val
 	}
 
-	if value,ok:= os.LookupEnv(dsn); ok {
-		config.DatabaseSoruceName = value
+	if val := os.Getenv("DATABASE_URI"); val != "" {
+		config.DatabaseSoruceName = val
 	}
 
-	if value,ok:=os.LookupEnv(serverAddr); ok {
-		config.ServerAddress = value
+	if val := os.Getenv("ACCRUAL_SYSTEM_ADDRESS"); val != "" {
+		config.AccrualSystemAddress = val
+	}
+
+	if val := os.Getenv("JWT_SECRET_KEY"); val != "" {
+		config.SecretKey = val
+	}
+
+	if config.AccrualSystemAddress != "" && !strings.HasPrefix(config.AccrualSystemAddress, "http") {
+		config.AccrualSystemAddress = "http://" + config.AccrualSystemAddress
 	}
 
 	return config

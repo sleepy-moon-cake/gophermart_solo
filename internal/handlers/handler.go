@@ -129,7 +129,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("login:", "error", err)
 
-		if errors.Is(err, shared.ErrNotMatchPassword) {
+		if errors.Is(err, shared.ErrNotMatchPassword) || errors.Is(err, shared.ErrNotFound) {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
@@ -214,9 +214,26 @@ func (h *UserHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var body = make([]models.OrderResponse, 0, len(orders))
+
+	for _, v := range orders {
+		res := models.OrderResponse{
+			Number:     v.Number,
+			Status:     v.Status,
+			UploadedAt: v.UploadedAt,
+		}
+
+		if v.Status == models.OrderStatusProcessed {
+			accrualFloat64 := float64(v.Accrual) / 100
+			res.Accrual = &accrualFloat64
+		}
+
+		body = append(body, res)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
-	if err := json.NewEncoder(w).Encode(orders); err != nil {
+	if err := json.NewEncoder(w).Encode(body); err != nil {
 		slog.Error("getOrders: failed to Encode orders", "error", err)
 	}
 }

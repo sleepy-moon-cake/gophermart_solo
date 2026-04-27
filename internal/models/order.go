@@ -7,6 +7,14 @@ type Order struct {
 	OwnerID    int       `json:"-"`
 	Number     string    `json:"number"`
 	Status     string    `json:"status"`
+	Accrual    int       `json:"accrual"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}
+
+type OrderResponse struct {
+	Number     string    `json:"number"`
+	Status     string    `json:"status"`
+	Accrual    *float64  `json:"accrual,omitempty"` // Будет null или отсутствовать, если nil
 	UploadedAt time.Time `json:"uploaded_at"`
 }
 
