@@ -99,7 +99,7 @@ func (r *UserRepository) GetUserOrders(ctx context.Context, userId int) ([]model
 	var orders = make([]models.Order, 0)
 
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT number, status, uploaded_at FROM orders WHERE owner_id = $1 ORDER BY uploaded_at ASC",
+		"SELECT number, status, accrual, uploaded_at FROM orders WHERE owner_id = $1 ORDER BY uploaded_at ASC",
 		userId)
 
 	if err != nil {
@@ -110,7 +110,7 @@ func (r *UserRepository) GetUserOrders(ctx context.Context, userId int) ([]model
 	for rows.Next() {
 		var order models.Order
 
-		err := rows.Scan(&order.Number, &order.Status, &order.UploadedAt)
+		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
 		if err != nil {
 			return nil, fmt.Errorf("get user orders scan: %w", err)
 		}

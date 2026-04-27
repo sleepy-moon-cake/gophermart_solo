@@ -52,6 +52,7 @@ func CreateRouter(service UserService,
 			r.Get("/orders", h.GetOrders)
 			r.Get("/balance", h.GetBalance)
 			r.Post("/balance/withdraw", h.WithdrawBalance)
+			r.Get("/withdrawals", h.Withdrawals)
 		})
 	})
 
@@ -340,4 +341,3 @@ func (h *UserHandler) Withdrawals(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Withdrawals, encode", "error", err)
 	}
 }
-

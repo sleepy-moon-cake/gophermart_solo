@@ -3,7 +3,7 @@ package models
 import "time"
 
 type WithdrawRequest struct {
-	OrderNumber string  `json:"order_number"`
+	OrderNumber string  `json:"order"`
 	Sum         float64 `json:"sum"`
 }
 
