@@ -63,6 +63,7 @@ func run() error {
 	router := handlers.CreateRouter(userService, config.SecretKey,
 		middlewares.AuthMiddleware(middlewares.SetSecretKey(config.SecretKey)),
 		middlewares.LoggerMiddleware,
+		middlewares.Compressor,
 	)
 
 	srv := http.Server{

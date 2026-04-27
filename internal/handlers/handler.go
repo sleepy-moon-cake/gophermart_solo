@@ -17,15 +17,6 @@ import (
 	"github.com/sleepy-moon-cake/gophermart_solo/internal/utils"
 )
 
-// * `POST /api/user/register` — регистрация пользователя;
-// * `POST /api/user/login` — аутентификация пользователя;
-// * `POST /api/user/orders` — загрузка пользователем номера заказа для расчёта;
-// * `GET /api/user/orders` — получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях;
-// * `GET /api/user/balance` — получение текущего баланса счёта баллов лояльности пользователя;
-// * `POST /api/user/balance/withdraw` — запрос на списание баллов с накопительного счёта в счёт оплаты нового заказа;
-// HERE
-// * `GET /api/user/withdrawals` — получение информации о выводе средств с накопительного счёта пользователем.
-
 type UserService interface {
 	Register(ctx context.Context, payload *models.RegisterData) (int, error)
 	Login(ctx context.Context, payload *models.RegisterData) (*models.User, error)
@@ -36,16 +27,17 @@ type UserService interface {
 	Withdrawals(context.Context) ([]models.Withdraw, error)
 }
 
-// POST /api/user/orders
-
 func CreateRouter(service UserService,
 	secretKey string,
 	authWM func(http.Handler) http.Handler,
 	loggerWM func(http.Handler) http.Handler,
+	compressWM func(http.Handler) http.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 
 	h := UserHandler{service: service, secretKey: secretKey}
+
+	router.Use(compressWM)
 
 	router.Use(loggerWM)
 
@@ -348,3 +340,4 @@ func (h *UserHandler) Withdrawals(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Withdrawals, encode", "error", err)
 	}
 }
+

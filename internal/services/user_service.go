@@ -118,10 +118,3 @@ func (s *UserService) Withdrawals(ctx context.Context) ([]models.Withdraw, error
 
 	return s.repository.Withdrawals(ctx, userID)
 }
-
-// type UserService interface {
-// 	Register(ctx context.Context, payload *models.RegisterData) error
-// 	Login(ctx context.Context, payload *models.RegisterData) error
-// 	GetBalance() error
-// 	GetWithdrawals() error
-// }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -47,17 +46,16 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 	if c.writeHeaderCalled {
 		return
 	}
-
 	c.writeHeaderCalled = true
 
 	ct := c.Header().Get("Content-Type")
-	cl := c.Header().Get("Content-Length")
-	size, _ := strconv.Atoi(cl)
 
-	if statusCode >= 200 && statusCode < 300 &&
-		((strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html")) && (size == 0 || size >= 1400)) {
+	isCompressible := strings.Contains(ct, "application/json") ||
+		strings.Contains(ct, "text/html") ||
+		strings.Contains(ct, "text/plain")
+
+	if statusCode >= 200 && statusCode < 300 && isCompressible {
 		c.Header().Set("Content-Encoding", "gzip")
-
 		c.Header().Del("Content-Length")
 		c.compress = true
 		c.zw = gzip.NewWriter(c.ResponseWriter)
