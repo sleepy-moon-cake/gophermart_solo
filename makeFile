@@ -7,11 +7,14 @@ ACCRUAL_SYSTEM_ADDRESS=http://$(ACCRUAL_PORT)
 DATABASE_URI=postgres://myuser:mypass@localhost:5432/mydb?sslmode=disable
 ACCRUAL_BIN=./cmd/accrual/accrual_darwin_arm64
 
+JWT_SECRET_KEY=sXYKyBxAj+8mw3z58xeLV8AxBOevMA9eGajV+QOAwUA=
+
 run-accrual:
 	chmod +x $(ACCRUAL_BIN)
 	$(ACCRUAL_BIN) -a $(ACCRUAL_PORT)
 
 run:
+	JWT_SECRET_KEY=$(JWT_SECRET_KEY) \
 	RUN_ADDRESS=$(RUN_ADDRESS) \
 	DATABASE_URI=$(DATABASE_URI) \
 	ACCRUAL_SYSTEM_ADDRESS=$(ACCRUAL_SYSTEM_ADDRESS) \

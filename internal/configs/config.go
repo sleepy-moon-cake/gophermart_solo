@@ -2,6 +2,7 @@ package configs
 
 import (
 	"flag"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -19,6 +20,12 @@ func GetConfig() *Config {
 	r := flag.String("r", "http://localhost:8081", "accrual system address")
 	flag.Parse()
 
+	secret := os.Getenv("JWT_SECRET_KEY")
+	if secret == "" {
+		slog.Error("JWT_SECRET_KEY environment variable is required")
+		os.Exit(1)
+	}
+
 	config := &Config{
 		SecretKey:            "sXYKyBxAj+8mw3z58xeLV8AxBOevMA9eGajV+QOAwUA=",
 		ServerAddress:        *a,
@@ -26,7 +33,6 @@ func GetConfig() *Config {
 		AccrualSystemAddress: *r,
 	}
 
-	// 2. Читаем ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ (они приоритетнее флагов по ТЗ)
 	if val := os.Getenv("RUN_ADDRESS"); val != "" {
 		config.ServerAddress = val
 	}

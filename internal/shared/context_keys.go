@@ -1,6 +1,8 @@
 package shared
 
+type contextKey string
+
 const (
-	UserID = "UserID"
-	LogErr = "LogErr"
+	UserID contextKey = "UserID"
+	LogErr contextKey = "LogErr"
 )
